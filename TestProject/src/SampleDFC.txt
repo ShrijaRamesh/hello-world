@@ -1,0 +1,581 @@
+package com.sample.dctm.programs;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.StringTokenizer;
+
+import com.documentum.com.DfClientX;
+import com.documentum.com.IDfClientX;
+import com.documentum.fc.client.DfClient;
+import com.documentum.fc.client.DfQuery;
+import com.documentum.fc.client.IDfACL;
+import com.documentum.fc.client.IDfActivity;
+import com.documentum.fc.client.IDfClient;
+import com.documentum.fc.client.IDfCollection;
+import com.documentum.fc.client.IDfDocbaseMap;
+import com.documentum.fc.client.IDfDocument;
+import com.documentum.fc.client.IDfFolder;
+import com.documentum.fc.client.IDfProcess;
+import com.documentum.fc.client.IDfQuery;
+import com.documentum.fc.client.IDfQueueItem;
+import com.documentum.fc.client.IDfSession;
+import com.documentum.fc.client.IDfSessionManager;
+import com.documentum.fc.client.IDfSysObject;
+import com.documentum.fc.client.IDfType;
+import com.documentum.fc.client.IDfTypedObject;
+import com.documentum.fc.client.IDfVirtualDocument;
+import com.documentum.fc.client.IDfVirtualDocumentNode;
+import com.documentum.fc.client.IDfWorkflow;
+import com.documentum.fc.client.IDfWorkflowBuilder;
+import com.documentum.fc.client.IDfWorkitem;
+import com.documentum.fc.common.DfException;
+import com.documentum.fc.common.DfList;
+import com.documentum.fc.common.DfLoginInfo;
+import com.documentum.fc.common.IDfAttr;
+import com.documentum.fc.common.IDfId;
+import com.documentum.fc.common.IDfList;
+import com.documentum.fc.common.IDfLoginInfo;
+import com.documentum.operations.IDfCancelCheckoutNode;
+import com.documentum.operations.IDfCancelCheckoutOperation;
+import com.documentum.operations.IDfCheckinNode;
+import com.documentum.operations.IDfCheckinOperation;
+import com.documentum.operations.IDfCheckoutNode;
+import com.documentum.operations.IDfCheckoutOperation;
+import com.documentum.operations.IDfExportNode;
+import com.documentum.operations.IDfExportOperation;
+import com.documentum.operations.IDfImportNode;
+import com.documentum.operations.IDfImportOperation;
+import com.documentum.operations.IDfOperation;
+import com.documentum.operations.IDfOperationError;
+import com.documentum.xml.xdql.DfXmlQuery;
+import com.documentum.xml.xdql.IDfXmlQuery;
+
+public class DFCWorkShop {
+
+IDfSysObject sysObject = null;
+IDfSession idfSession = null;
+IDfSessionManager sessMgr = null;
+
+public DFCWorkShop(String user, String passwd, String docbase) throws Exception {
+getDfSession(user, passwd, docbase);
+}
+
+public IDfSession getDfSession(String args1, String args2, String args3) throws Exception {
+
+IDfLoginInfo login = new DfLoginInfo();
+login.setUser(args1);
+login.setPassword(args2);
+IDfClient client = new DfClient();
+sessMgr = client.newSessionManager();
+sessMgr.setIdentity(args3, login);
+idfSession = sessMgr.getSession(args3);
+
+if ( idfSession != null )
+System.out.println(“Session created successfully”);
+
+return idfSession;
+}
+
+public void getAllDocbases() throws Exception {
+
+IDfClient client = DfClient.getLocalClient();
+IDfDocbaseMap docbaseMap = client.getDocbaseMap();
+for ( int i=0;i<docbaseMap.getDocbaseCount();i++) {
+System.out.println(“Docbase Name : ” + docbaseMap.getDocbaseName(i));
+System.out.println(“Docbase Desc : ” + docbaseMap.getDocbaseDescription(i));
+}
+}
+
+public void createCabinet() throws Exception {
+
+IDfFolder cabinet = (IDfFolder) idfSession.newObject(“dm_cabinet”);
+if (cabinet != null) {
+cabinet.setObjectName(“Training Cabinet XXX”);
+cabinet.save();
+}
+}
+
+public void createFolder() throws Exception {
+
+IDfFolder folder = (IDfFolder) idfSession.newObject(“dm_folder”);
+if (folder != null) {
+folder.setObjectName(“Folder Level 2”);
+folder.link(“/Training Cabinet XXX”);
+folder.save();
+}
+}
+
+public IDfDocument createDocument() throws Exception {
+
+IDfDocument document = (IDfDocument) idfSession.newObject(“dm_document”);
+if (document != null) {
+document.setObjectName(“Test-Document”);
+document.setContentType(“crtext”);
+document.setFile(“C:\\Documentum\\config\\dfc.properties”);
+document.link(“/Training Cabinet XXX/Folder Level 1”);
+document.save();
+}
+return document;
+}
+
+public void updateAttributes() throws Exception {
+
+sysObject = (IDfSysObject) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 1/New Document”);
+sysObject.setString(“object_name”, “New Document”);
+sysObject.setString(“authors”, “Prasad”);
+sysObject.setRepeatingString(“authors”,1,”RamKumar”);
+sysObject.save();
+}
+
+public void getAttributes() throws Exception {
+
+sysObject = (IDfSysObject) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 1/New Document”);
+if (sysObject != null ) {
+System.out.println(“objectName ” + sysObject.getString(“object_name”));
+//System.out.println(“authors ” + sysObject.getString(“authors”));
+String authors = sysObject.getAllRepeatingStrings(“authors”, “,”);
+
+List list = new ArrayList();
+StringTokenizer st = new StringTokenizer(authors, “,”);
+System.out.println(“length of st ” + st.countTokens());
+while( st.hasMoreTokens() ) {
+list.add(st.nextElement());
+}
+System.out.println(“length ” + list.size());
+
+for (int i=0;i<list.size();i++) {
+System.out.println(“Author[“+i+”] ” + list.get(i));
+}
+}
+}
+
+public void getTypeAttributes() throws Exception {
+
+IDfType type = (IDfType)idfSession.newObject(“dm_document”);
+for (int i=0;i<type.getAttrCount();i++ ) {
+IDfAttr attr = type.getAttr(i);
+System.out.println(“Name ” + attr.getName());
+System.out.println(“Datatype ” + attr.getDataType());
+System.out.println(“Length ” + attr.getLength());
+System.out.println(“IS Repeating Attr ” + attr.isRepeating());
+}
+}
+
+public void checkoutDoc() throws Exception {
+
+sysObject = (IDfSysObject) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 1/”);
+if (!sysObject.isCheckedOut()) // if it is not checked out
+sysObject.checkout();
+
+System.out.println(“is Check out ” + sysObject.isCheckedOut());
+}
+
+public void checkinDoc() throws Exception {
+
+sysObject = (IDfSysObject) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 1/Test-Document”);
+
+if (sysObject.isCheckedOut() ) { // if it is checked out
+sysObject.checkin(false,”CURRENT”);
+}
+}
+
+public void deleteDoc() throws Exception {
+
+sysObject = (IDfSysObject) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 1/Test-Document”);
+if (sysObject != null ) {
+sysObject.destroyAllVersions();     // delete all versions
+System.out.println(“object destroyed…..”);
+}
+}
+
+public void createVirtualDocument() throws Exception {
+
+IDfSysObject pSys = (IDfSysObject) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 2/log4j.properties”);
+IDfSysObject cSys = (IDfSysObject) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 1/trace.log”);
+
+pSys.setIsVirtualDocument(true);
+pSys.save();
+IDfVirtualDocument vDoc = pSys.asVirtualDocument(“CURRENT”, false);
+IDfVirtualDocumentNode pNode = vDoc.getRootNode();
+pSys.checkout();
+
+IDfVirtualDocumentNode nodeChild1 =
+vDoc.addNode( pNode, null, cSys.getChronicleId(),
+“CURRENT”, false, false);
+
+pSys.checkin(false, “CURRENT”);
+}
+
+public void viewVirtualDocument() throws Exception {
+
+IDfSysObject pSys = (IDfSysObject) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 2/log4j.properties”);
+if ( pSys.isVirtualDocument() ) {
+System.out.println(“virtual document –> true”);
+IDfVirtualDocument vDoc = pSys.asVirtualDocument(“CURRENT”, false);
+IDfVirtualDocumentNode pNode = vDoc.getRootNode();
+
+System.out.println(“Iterating thru the lis to get the child nodes”);
+for ( int i=0;i<pNode.getChildCount();i++) {
+IDfVirtualDocumentNode cNode = pNode.getChild(i);
+System.out.println(“Child Name ” +cNode.getSelectedObject().getObjectName());
+}
+}
+}
+
+public void exportVirtualDocument() throws Exception {
+
+System.out.println(“exporting virtual document”);
+
+IDfClientX clientx = new DfClientX();
+IDfExportOperation expOperation = clientx.getExportOperation();
+
+IDfSysObject sysObject = (IDfSysObject) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 2/log4j.properties”);
+if ( sysObject.isVirtualDocument() ) {
+IDfVirtualDocument Vdoc = sysObject.asVirtualDocument(“CURRENT”, false);
+IDfExportNode expNode = (IDfExportNode) expOperation.add(sysObject);
+expOperation.setDestinationDirectory(expOperation.getDefaultDestinationDirectory());
+boolean flag = expOperation.execute();
+displayError(expOperation, flag);
+}
+}
+
+public void cancelCheckoutDocument() throws Exception {
+
+IDfClientX clientx = new DfClientX();
+IDfCancelCheckoutOperation cancelcheckoutOper = clientx.getCancelCheckoutOperation();
+sysObject = (IDfSysObject) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 2/log4j.properties”);
+
+IDfCancelCheckoutNode node = (IDfCancelCheckoutNode) cancelcheckoutOper.add(sysObject);
+boolean flag = cancelcheckoutOper.execute();
+displayError(cancelcheckoutOper, flag);
+}
+
+public void checkoutDocument() throws Exception {
+
+IDfClientX clientx = new DfClientX();
+IDfCheckoutOperation checkoutOper = clientx.getCheckoutOperation();
+
+System.out.println(“Checkout Dir ” + checkoutOper.getDefaultDestinationDirectory());
+checkoutOper.setDestinationDirectory(checkoutOper.getDefaultDestinationDirectory());
+
+sysObject = (IDfSysObject) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 2/log4j.properties”);
+
+IDfCheckoutNode node = (IDfCheckoutNode) checkoutOper.add(sysObject);
+boolean flag = checkoutOper.execute();
+displayError(checkoutOper, flag);
+
+}
+
+public void checkinDocument() throws Exception {
+
+IDfClientX clientx = new DfClientX();
+IDfCheckinOperation checkinOper = clientx.getCheckinOperation();
+
+IDfCheckinNode node = (IDfCheckinNode) checkinOper.add(sysObject);
+System.out.println(“Flag —->” + checkinOper.execute());
+}
+
+public void importDocument() throws Exception {
+
+IDfSysObject sysObject = (IDfFolder) idfSession.getObjectByPath(“/Training Cabinet XXX/Folder Level 2”);
+System.out.println(“Object ID ” + sysObject.getObjectId());
+
+IDfClientX clientx = new DfClientX();
+IDfImportOperation importOper = clientx.getImportOperation();
+importOper.setSession(idfSession);
+
+if (importOper == null )
+System.out.println(“operation object is null”);
+
+importOper.setDestinationFolderId(sysObject.getObjectId());
+importOper.setVersionLabels(“imported using operation”);
+
+IDfImportNode node = (IDfImportNode) importOper.add(“C:\\Documentum\\config\\log4j.properties”);
+node.setFormat(“pdf”);
+
+boolean flag = importOper.execute();
+displayError(importOper, flag);
+}
+
+public void displayError(IDfOperation operation, boolean flag) throws Exception {
+
+if (!flag) {
+
+IDfList errlist = operation.getErrors();
+
+for (int i=0;i<errlist.getCount(); i++) {
+IDfOperationError errOperation = (IDfOperationError) errlist.get(i);
+System.out.println(“Error MSG ” + errOperation.getMessage());
+}
+}
+}
+
+public void dmclAPI() throws Exception {
+
+System.out.println(“Starting……..”);
+IDfSysObject sysObj = (IDfSysObject) idfSession.getObjectByQualification(“dm_document where object_name=’Test-Document'”);
+String rObjectId = sysObj.getObjectId().getId();
+
+String name = (String)idfSession.apiGet(“get”,rObjectId + “,object_name”);
+System.out.println(“Name : ” + name);
+//idfSession.apiSet(“set”,rObjectId+”,title”,”sample-doc”);
+idfSession.apiExec(“link”,rObjectId+”,/Training Cabinet XXX/Folder Level 2″);
+System.out.println(“Linked ” + idfSession.apiExec(“save”,rObjectId));
+}
+
+public void collection() throws Exception {
+
+IDfQuery query = new DfQuery();
+query.setDQL(“select * from dm_document where object_name=’New Document’ and any r_version_label like ‘CURRENT%'”);
+IDfCollection coll = query.execute(idfSession, 0);
+
+while ( coll.next() ) {
+IDfTypedObject typeObject = (IDfTypedObject) coll.getTypedObject();
+System.out.println(“Object Name ” + typeObject.getString(“r_object_id”));
+System.out.println(“creation date ” + typeObject.getString(“r_creation_date”));
+}
+
+if ( coll != null )
+coll.close();
+}
+
+public void startWorkflow() throws Exception {
+
+//to get the attachment document
+IDfSysObject sysObj = (IDfSysObject)
+idfSession.getObjectByQualification(“dm_document where object_name=’DFCtest'”);
+
+// to get the Workflow Template
+IDfProcess process = (IDfProcess)
+idfSession.getObjectByQualification(“dm_process where object_name like ‘%INDIA_TIMES%'”);
+
+//to create a Workflo Builder to start a workflow
+IDfWorkflowBuilder builder = idfSession.newWorkflowBuilder(process.getObjectId());
+IDfId wfId = builder.initWorkflow();
+
+//get the First Activity
+IDfList startActivityNames = builder.getStartActivityNames();
+IDfList startActivities = builder.getStartActivityIds();
+String activityName = startActivityNames.getString(0);
+IDfId activityID = (IDfId) startActivities.get(0);
+IDfActivity activity = (IDfActivity) idfSession.getObject(activityID);
+
+//to get the Package Name , Port and Package DocType
+int nPorts = activity.getPortCount();
+String InputPortName = null;
+String PkgType = null;
+String PkgName = null;
+
+for (int j=0; j<nPorts; j++) {
+System.out.println( “Port Name: ” + activity.getPortName(j) + “, ” + “Port Type = ” + activity.getPortType(j) );
+
+if ( activity.getPortType(j).equals( “INPUT” ) ) {
+InputPortName = activity.getPortName(j);
+PkgType = activity.getPackageType(j);
+PkgName = activity.getPackageName(j);
+}
+}
+
+//to Add the attachment document to List
+IDfList dfList = new DfList();
+dfList.append(sysObj.getObjectId());
+
+IDfId wfId2 = builder.runWorkflow();
+//Add a Package to Workflow Builder
+builder.addPackage(activityName, InputPortName, PkgName, PkgType, null, false, dfList);
+System.out.println(“package added”);
+
+}
+
+public void getInbox() throws Exception {
+
+IDfCollection tasks = idfSession.getTasks(“temp”, IDfSession.DF_TASKS, “name, date_sent, message “, “task_name”);
+
+try {
+while (tasks.next()) {
+IDfWorkitem wi = (IDfWorkitem) idfSession.getObject(tasks.getId(“item_id”));
+IDfId queueItemId = wi.getQueueItemId();
+IDfQueueItem qi = (IDfQueueItem) idfSession.getObject(queueItemId);
+System.out.println(tasks.getString(“sent_by”)+”   “+tasks.getString(“task_name”)+”   “+
+tasks.getString(“date_sent”)+”   “+tasks.getString(“message”)+”   “+qi.getItemName());
+IDfActivity dfActivity=wi.getActivity();
+System.out.println(“\tActivity Information : “+ dfActivity.getString(“object_name”));
+IDfCollection packColl= null;
+try {
+packColl=wi.getPackages(“”);
+while(packColl.next()) {
+IDfSysObject sysObj=(IDfSysObject) idfSession.getObject(packColl.getId(“r_component_id”));
+System.out.println(“\t Package Information: ” + sysObj.getString(“object_name”));
+}
+} finally {
+if(packColl != null)
+packColl.close();
+}
+// to finish a Task or Workitem
+//finishTask(wi);
+}
+} finally {
+if(tasks!=null) tasks.close();
+}
+}
+
+public void finishTask(IDfWorkitem wi) throws Exception {
+
+if(wi.getRuntimeState() == IDfWorkflow.DF_WF_STATE_DORMANT){
+wi.acquire();
+}
+wi.complete();
+}
+
+public void attachLC() throws Exception{
+
+IDfSysObject mDocs=(IDfSysObject)
+idfSession.getObjectByQualification(“dm_document where object_name=’UniqueDoc’ “);
+
+IDfSysObject procObj=(IDfSysObject)
+idfSession.getObjectByQualification(“dm_policy where object_name=’Training_LC’ “);
+mDocs.attachPolicy(procObj.getObjectId(), “Author”,””);
+
+}
+
+public void promoteLC(String State) throws Exception{
+IDfSysObject mDocs=(IDfSysObject)
+idfSession.getObjectByQualification(“dm_document where object_name=’UniqueDoc’ “);
+mDocs.promote(State,false,false);
+}
+
+public void demoteLC(String State) throws Exception{
+IDfSysObject mDocs=(IDfSysObject)
+idfSession.getObjectByQualification(“dm_document where object_name=’UniqueDoc’ “);
+mDocs.demote(State,false);
+}
+
+public void expireLC(String State) throws Exception{
+IDfSysObject mDocs=(IDfSysObject) idfSession.getObjectByQualification(“dm_document where object_name=’UniqueDoc’ “);
+mDocs.suspend(State,false,false);
+}
+
+public void resumeLC(String State) throws Exception{
+IDfSysObject mDocs=(IDfSysObject) idfSession.getObjectByQualification(“dm_document where object_name=’UniqueDoc’ “);
+mDocs.resume(State,false,false,false);
+}
+public void releaseSession() throws Exception {
+sessMgr.release(idfSession);
+}
+
+public void assignACL() throws Exception {
+
+IDfSysObject mDocs=(IDfSysObject) idfSession.getObjectByQualification(“dm_document where object_name=’UniqueDoc’ “);
+IDfACL dfACL=(IDfACL) idfSession.getObjectByQualification(“dm_acl where object_name=’TrainingACL’ “);
+mDocs.setACL(dfACL);
+mDocs.save();
+}
+
+public boolean getdm_documentRecordsAsXML(IDfSession sess)throws DfException
+{
+String dql = “select * from dm_document where object_name=’Training'”;
+String strVal = null;
+IDfId idObj = null;
+IDfXmlQuery objDfXmlQuery = new DfXmlQuery();
+objDfXmlQuery.init();
+objDfXmlQuery.setDql(dql);
+objDfXmlQuery.execute(IDfQuery.DF_READ_QUERY,sess);
+String xml = objDfXmlQuery.getXMLString();
+System.out.println(“XML is  : ” + xml);
+return true;
+
+}
+
+public static void main(String[] args) throws Exception {
+
+DFCWorkShop object = new DFCWorkShop(args[0], args[1], args[2]);
+
+try {
+
+// To get a list of available docbase
+//object.getAllDocbases();
+
+// To create a cabinet (dm_cabinet) in docbase
+//object.createCabinet();
+
+// To create a folder (dm_folder object) in docbase
+//object.createFolder();
+
+// To create a document (dm_document object) in docbase
+//object.createDocument();
+
+// To check out a document from docbase using IDfOperations
+//object.checkoutDocument();
+
+// To check in a document to docbase using IDfOperations
+//object.checkinDocument();
+
+// making use of IAPI methods
+//object.dmclAPI();
+
+// To import a document into docbase
+//object.importDocument();
+
+// To cancelcheckout a document into docbase
+//object.cancelCheckoutDocument();
+
+// To check out a document from docbase
+//object.checkoutDoc();
+
+// To check in a document to docbase
+//object.checkinDoc();
+
+// To delete a document from docbase
+//object.deleteDoc();
+
+// To update document’s in docbase
+//object.updateAttributes();
+
+// To retrieve document’s attributes from docbase
+//object.getAttributes();
+
+// To create a virtual document in docbase
+//object.createVirtualDocument();
+
+// To export a virtual document from docbase
+//object.exportVirtualDocument();
+
+// To view virtual document from docbase
+//object.viewVirtualDocument();
+
+// To retrieve document from document using IDQL
+//object.collection();
+
+// To create and start workflow
+//object.startWorkflow();
+
+// to view task in inbox
+//object.getInbox();
+
+// To attach a lifeCycle to a document in docbase
+//object.attachLC();
+
+// To promote a lifeCycle state of a document
+//object.promoteLC(“Review”);
+
+// To demote a lifeCycle state of a document
+//object.demoteLC(“Author”);
+
+// To expire a lifeCycle state of a document
+//object.expireLC(“Author”);
+
+// To resume a lifeCycle state of a document
+//object.resumeLC(“Author”);
+
+// To assign a ACL to a document
+//object.assignACL();
+
+} finally {
+// to release a docbase session
+object.releaseSession();
+}
+}
+}
+
+
+
